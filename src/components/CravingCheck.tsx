@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { saveCheckIn } from "@/lib/checkInStorage";
+import { ClockArrowUp } from "lucide-react";
 
 const BreathingCircle = () => (
   <div className="flex items-center justify-center my-8">
@@ -290,10 +293,23 @@ const YesFinal = ({ choice, onDone }: { choice: string; onDone: () => void }) =>
 };
 
 const CravingCheck = () => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [path, setPath] = useState<"yes" | "no" | null>(null);
+  const [intensity, setIntensity] = useState<number | undefined>();
+  const [trigger, setTrigger] = useState<string | undefined>();
   const [choice, setChoice] = useState("deciding");
   const [done, setDone] = useState(false);
+
+  const finishCheckIn = (overrideChoice?: string) => {
+    saveCheckIn({
+      craving: path === "yes",
+      intensity,
+      trigger,
+      choice: path === "yes" ? (overrideChoice || choice) : undefined,
+    });
+    setDone(true);
+  };
 
   if (done) {
     return (
@@ -318,30 +334,57 @@ const CravingCheck = () => {
 
     if (path === "no") {
       if (step === 1) return <NoScreen1 onNext={() => setStep(2)} />;
-      if (step === 2) return <NoFinal onDone={() => setDone(true)} />;
+      if (step === 2) return <NoFinal onDone={() => finishCheckIn()} />;
     }
 
     if (path === "yes") {
-      if (step === 1) return <IntensitySlider onNext={() => setStep(2)} />;
-      if (step === 2) return <TriggerScreen onNext={() => setStep(3)} />;
+      if (step === 1)
+        return (
+          <IntensitySlider
+            onNext={(val) => {
+              setIntensity(val ? Number(val) : undefined);
+              setStep(2);
+            }}
+          />
+        );
+      if (step === 2)
+        return (
+          <TriggerScreen
+            onNext={(val) => {
+              setTrigger(val);
+              setStep(3);
+            }}
+          />
+        );
       if (step === 3) return <BreathingScreen onNext={() => setStep(4)} />;
       if (step === 4)
         return (
           <ChoiceScreen
             onNext={(val) => {
-              setChoice(val || "deciding");
+              const c = val || "deciding";
+              setChoice(c);
               setStep(5);
             }}
           />
         );
-      if (step === 5) return <YesFinal choice={choice} onDone={() => setDone(true)} />;
+      if (step === 5) return <YesFinal choice={choice} onDone={() => finishCheckIn(choice)} />;
     }
 
     return null;
   };
 
   return (
-    <div className="min-h-dvh bg-app-gradient flex flex-col">
+    <div className="min-h-dvh bg-app-gradient flex flex-col relative">
+      {/* History button */}
+      {step === 0 && (
+        <button
+          onClick={() => navigate("/history")}
+          className="absolute top-5 right-5 w-10 h-10 flex items-center justify-center rounded-full bg-card border border-border active:scale-95 transition-transform z-10"
+          aria-label="View history"
+        >
+          <ClockArrowUp className="w-5 h-5 text-muted-foreground" />
+        </button>
+      )}
       {renderStep()}
     </div>
   );
